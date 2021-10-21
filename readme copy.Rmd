@@ -1,0 +1,266 @@
+# R course: Introduction to Bayesian GLMs
+
+[Chris Brown](https://experts.griffith.edu.au/7867-chris-brown)
+
+Welcome to  "Introduction to Bayesian GLMs"
+
+## Agenda 
+
+    Intro to Bayesian stats theory
+
+    Bayesian estimation algorithms (MCMC and HMC)
+
+    Simulating data
+    
+    Frequentist GLM
+
+    Simple model with brms package
+
+    Checking convergence
+
+    Plotting posteriors
+
+    Lunch break ~ 30-45 minutes
+
+    Under the hood - custom stan code
+
+    Random effects with brms
+
+    Unusual distributions with brms
+
+    Playing with priors
+
+
+```{r}
+library(simstudy)
+library(brms)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+theme_set(theme_classic())
+```
+
+
+## Using simstudy
+
+```{r}
+def <- defData(varname = "sst", dist = "uniform", formula = "8;25") %>%
+  defData(., varname = "fish", dist = "poisson", 
+    formula = " sst * 0.1", link = "log")
+```
+
+```{r}
+set.seed(42)
+dat <- genData(50, def) %>%
+  arrange(sst)
+ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point()
+```
+## Fitting a glm
+
+```{r}
+m1 <- glm(fish ~ sst, family = "poisson",
+          data = dat)
+pred_m1 <- predict(m1,
+                        se = TRUE)
+coef(m1)
+```
+
+```{r}
+dat$pred_glm <- pred_m1$fit
+dat$pred_glm_se <- pred_m1$se.fit
+
+g1 <- ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point() + 
+  geom_line(aes(y = exp(pred_glm)), color = "red") + 
+  geom_ribbon(aes(ymin = exp(pred_glm - pred_glm_se*1.96),
+                  ymax = exp(pred_glm + pred_glm_se*1.96)),
+              alpha = 0.5, 
+              fill = "red")
+
+g1
+```
+## Bayesian GLM with brms
+
+Try this first with only 1050 samples
+
+```{r}
+b1 <- brm(fish ~ sst, family = "poisson",
+          data = dat,
+          chains = 4,
+          iter = 1200,
+          thin = 1,
+          warmup = 1000,
+          cores = 4)
+summary(b1)
+```
+
+## Checking convergence 
+
+```{r}
+plot(b1)
+```
+
+
+```{r eval = FALSE}
+# shinystan::launch_shinystan(b1)
+```
+
+
+## Plotting predictions 
+
+```{r}
+conditional_effects(b1)
+```
+## Extracting samples 
+
+```{r}
+pred_b1 <- posterior_epred(b1)
+dim(pred_b1)
+
+```
+
+```{r}
+quantile(pred_b1[,1], c(0.025, 0.5, 0.975))
+```
+
+
+
+## Comparing to GLM 
+
+
+```{r}
+dat$pred_brm <- colMeans(pred_b1)
+dat$pred_brm_lwr <- apply(pred_b1, 2, 
+                          quantile, probs = 0.025)
+dat$pred_brm_upr <- apply(pred_b1, 2, 
+                          quantile, probs = 0.975)
+
+g2 <- ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point() + 
+  geom_line(aes(y = pred_brm), color = "blue") + 
+  geom_ribbon(aes(ymin = pred_brm_lwr,
+                  ymax = pred_brm_upr),
+              alpha = 0.5, 
+              fill = "blue")
+```
+
+```{r}
+g1 + g2
+```
+
+```{r}
+pred_b1 <- posterior_predict(b1)
+dat$pred_int <- colMeans(pred_b1)
+dat$pred_int_lwr <- apply(pred_b1, 2, 
+                          quantile, probs = 0.025)
+dat$pred_int_upr <- apply(pred_b1, 2, 
+                          quantile, probs = 0.975)
+
+g3 <- ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point() + 
+  geom_line(aes(y = pred_int), color = "green") + 
+  geom_ribbon(aes(ymin = pred_brm_lwr,
+                  ymax = pred_brm_upr),alpha = 0.5, 
+              fill = "green") +
+  geom_ribbon(aes(ymin = pred_int_lwr,
+                  ymax = pred_int_upr),
+              alpha = 0.5, 
+              fill = "lightblue")
+g3
+
+```
+
+## Under the hood - stan code 
+
+
+
+## Random effects 
+
+```{r}
+gen.school <- defData(
+  varname = "s0", dist = "normal",
+  formula = 0, variance = 3, id = "idSchool"
+)
+gen.school <- defData(gen.school,
+  varname = "nClasses",
+  dist = "noZeroPoisson", formula = 3
+)
+
+dtSchool <- genData(3, gen.school) #'
+dtSchool
+dtClass <- genCluster(dtSchool,
+  cLevelVar = "idSchool",
+  numIndsVar = "nClasses", level1ID = "idClass"
+)
+dtClass
+
+dtClass <- genCluster(dtSchool,
+  cLevelVar = "idSchool",
+  numIndsVar = 3, level1ID = "idClass"
+)
+dtClass
+```
+
+## Unusual distributions 
+
+Hurdle model
+
+
+
+
+## Priors
+
+
+```{r}
+
+tighter_prior <- 
+  set_prior("normal(-5,0.1)", class = "b", coef = "sst")
+b2 <- brm(fish ~ sst, family = "poisson",
+          data = dat,
+          chains = 4,
+          iter = 2000,
+          thin = 1,
+          warmup = 1000,
+          cores = 4,
+          prior = tighter_prior)
+summary(b2)
+```
+
+## Checking convergence 
+
+
+## Comparing to GLM 
+
+
+```{r}
+pred_b2 <- posterior_epred(b2)
+dat$pred_brm2 <- colMeans(pred_b2)
+dat$pred_brm_lwr2 <- apply(pred_b2, 2, 
+                          quantile, probs = 0.025)
+dat$pred_brm_upr2 <- apply(pred_b2, 2, 
+                          quantile, probs = 0.975)
+
+ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point() +
+  geom_line(aes(y = pred_brm), color = "blue") + 
+  geom_ribbon(aes(ymin = pred_brm_lwr,
+                  ymax = pred_brm_upr),
+              alpha = 0.5, 
+              fill = "blue") + 
+  geom_line(aes(y = pred_brm2), color = "green") + 
+  geom_ribbon(aes(ymin = pred_brm_lwr2,
+                  ymax = pred_brm_upr2),
+              alpha = 0.5, 
+              fill = "green")
+  
+  
+```
+
+Use predict(b1) if you want the predictive intervals 
+
