@@ -16,21 +16,30 @@ Introduction to Bayesian theory, GLMs and mixed models. How to fit Bayesian mode
 
 ## Package requirements
 
-R version 4 or greater 
+R version 4 or greater
 R Packages: rstan, brms and ggplot2
 
 ## Agenda  
 
-Intro to Bayesian stats theory
-Bayesian estimation algorithms (MCMC and HMC)
-Simple model with brms package
-Checking convergence
-Plotting posteriors
-Lunch break ~ 30-45minutes
-Random effects with brms
-Unusual distributions with brms
-Under the hood - custom stan code
-Playing with priors
+- Intro to Bayesian stats theory
+
+- Bayesian estimation algorithms (MCMC and HMC)
+
+- Simple model with brms package
+
+- Checking convergence
+
+- Plotting posteriors
+
+- Lunch break ~ 30-45 minutes
+
+- Random effects with brms
+
+- Unusual distributions with brms
+
+- Under the hood - custom stan code
+
+- Playing with priors
 
 ## Setup
 
