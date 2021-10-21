@@ -6,9 +6,9 @@ Welcome to our course site for "Introduction to Bayesian GLMs". Below are instru
 
 [Check out the conservation hackers site for upcoming online courses](https://www.conservationhackers.org/courses)
 
-### [Course notes](http://www.seascapemodels.org/intro-bayes-glm/2021-11-22-intro-bayes-glm.html)
+### [Course notes](http://www.seascapemodels.org/intro-bayes-glm/2021-11-22-intro-bayes-glm.html) (NOT YET ACTIVE)
 
-### [Data for course](https://github.com/cbrown5/intro-bayes-glm/blob/master/data-raw/data-raw.zip)
+### [Data for course](https://github.com/cbrown5/intro-bayes-glm/blob/master/data-raw/data-raw.zip) (NOT YET ACTIVE)
 
 ## Course Aims
 
