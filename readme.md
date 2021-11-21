@@ -6,9 +6,9 @@ Welcome to our course site for "Introduction to Bayesian GLMs". Below are instru
 
 [Check out the conservation hackers site for upcoming online courses](https://www.conservationhackers.org/courses)
 
-### [Course notes](http://www.seascapemodels.org/intro-bayes-glm/2021-11-22-intro-bayes-glm.html) (NOT YET ACTIVE)
+### [Course notes](http://www.seascapemodels.org/intro-bayes-glm/2021-11-22-intro-bayes-glm.html)
 
-### [Data for course](https://github.com/cbrown5/intro-bayes-glm/blob/master/data-raw/data-raw.zip) (NOT YET ACTIVE)
+No data required for this course, we simulate it as part of the course.
 
 ## Course Aims
 
@@ -21,25 +21,7 @@ R Packages: rstan, brms and ggplot2
 
 ## Agenda  
 
-- Intro to Bayesian stats theory
 
-- Bayesian estimation algorithms (MCMC and HMC)
-
-- Simple model with brms package
-
-- Checking convergence
-
-- Plotting posteriors
-
-- Lunch break ~ 30-45 minutes
-
-- Random effects with brms
-
-- Unusual distributions with brms
-
-- Under the hood - custom stan code
-
-- Playing with priors
 
 ## Setup
 

@@ -1,0 +1,92 @@
+# R course: Introduction to Bayesian GLMs
+
+Below is a document of some basics, it would be good if you come understanding this (especially the ggplot and model plotting). 
+
+[Chris Brown](https://experts.griffith.edu.au/7867-chris-brown)
+chris.brown@griffith.edu.au
+
+
+```{r}
+library(simstudy)
+library(brms)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+theme_set(theme_classic())
+```
+
+
+## Using simstudy
+
+Simulate some data, fish abundance vs SST. 
+
+We'll go over `simstudy` package in the course too. But here's how we'll simulate data. I won't assume you know this before hand, but you'll get more out of the course if you look up the simstudy and read the intro vignette before hand
+
+```{r eval = FALSE}
+vignette("simstudy",package = "simstudy")
+```
+
+Here's how we simulate our data (in the course we'll add REs too): 
+
+```{r}
+def <- defData(varname = "sst", dist = "uniform", formula = "8;25") %>%
+  defData(., varname = "fish", dist = "poisson", 
+    formula = " sst * 0.1", link = "log")
+set.seed(42)
+dat <- genData(50, def) %>%
+  arrange(sst)
+```
+
+
+Plot the data we just generated
+
+```{r}
+
+ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point()
+```
+
+
+## Fitting a glm 
+
+Be great if everyone comes understanding these steps!
+
+```{r}
+m1 <- glm(fish ~ sst, family = poisson(link = "log"),
+          data = dat)
+coef(m1)
+```
+
+
+Predict from the GLM (ie what does the model predict mean abundance to be at the original SST measurements):
+
+```{r}
+pred_m1 <- predict(m1,
+                        se = TRUE)
+
+dat$pred_glm <- pred_m1$fit
+dat$pred_glm_se <- pred_m1$se.fit
+
+```
+
+Code to plot predictions (mean + 95% CIs). Be great if you come understanding this ggplot syntax, so I don't have to explain geoms, ribbons etc.... 
+
+```{r}
+
+g1 <- ggplot(dat) + 
+  aes(x = sst, y = fish) + 
+  geom_point() + 
+  geom_line(aes(y = exp(pred_glm)), color = "red") + 
+  geom_ribbon(aes(ymin = exp(pred_glm - pred_glm_se*1.96),
+                  ymax = exp(pred_glm + pred_glm_se*1.96)),
+              alpha = 0.5, 
+              fill = "red")
+
+g1
+```
+
+I can explain why `exp(pred_glm - pred_glm_se*1.96)` gives the lower 95% CI in the workshop. 
+
+
+That's it for assumed knowledge. 

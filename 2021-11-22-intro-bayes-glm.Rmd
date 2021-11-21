@@ -1,20 +1,36 @@
+---
+title: 'Introduction to Bayesian GLMs'
+always_allow_html: true
+output:
+  html_document:
+    collapsed: no
+    smooth_scroll: no
+    theme: united
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '4'
+---  
+
 # R course: Introduction to Bayesian GLMs
 
 [Chris Brown](https://experts.griffith.edu.au/7867-chris-brown)
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results ='hide', warnings = FALSE, message = FALSE, comment = '', strip.white = FALSE)
+```  
+
 Welcome to  "Introduction to Bayesian GLMs"
 
-## Agenda 
+# Agenda 
 
     Intro to Bayesian stats theory
 
-    Bayesian estimation algorithms (MCMC and HMC)
-
-    Simulating data
+    GLM basics and simulating data 
     
-    Frequentist GLM
-
-    Simple model with brms package
+    Simple GLM with brms package
 
     Checking convergence
 
@@ -24,43 +40,161 @@ Welcome to  "Introduction to Bayesian GLMs"
 
     Under the hood - custom stan code
 
-    Random effects with brms
+    Prior predictive checks 
 
-    Unusual distributions with brms
+    Random effects in stan code 
+    
+    Random effects with brms 
+    
+    Importance of thinking about variance priors 
 
-    Playing with priors
+    Non-linear models 
+    
+    Many things you can do with brms
 
+    Conclusion 
+
+# About you 
+
+Introductions, what do you want to use Bayesian stats for? 
+Review quiz answers
+
+
+# Intro to Bayesian stats theory
+
+Probability theory  
+
+`P(A)`  
+
+`P(A|B)`  
+
+`P(A|B)*P(B) = P(B|A)*P(A)`  
+
+`P(A,B) = P(A|B)*P(B)`
+
+Now pretend A and B are data and models 
+
+Frequentist statistics 
+
+P(D|M) = Likelihood
+
+The model can be one parameter value e.g. a mean
+
+We look for the maximuum likelihood. 
+
+Hence the idea that there is a fixed 'truth' for frequentists
+
+
+Bayesians interpret it this way:
+
+P(M|D) = P(D|M)*P(M)/P(D)
+
+Explain each of these terms 
+
+Hence the idea that the truth is a random variable. 
+[Disease example](https://towardsdatascience.com/intro-to-bayesian-statistics-5056b43d248d)
+
+What is P(D) though?  
+
+It's a normalizing constant. Here's a simple example of how we can solve for that
+Assume there are only two models therefore
+
+`P(D) = P(D, M1) + P(D, M2)` 
+
+`P(D) = P(D|M1)P(M1) + P(D|M2)P(M2)`
+
+`P(M|D) = P(D|M)*P(M)/[P(D|M1)P(M1) + P(D|M2)P(M2)]`
+
+If there are three models the denominator has three additions and so on. 
+
+If the model space is continuous (ie a mean parameter) then we use integration to solve for P(D)
+Integration for complex multiparameter models can get very nasty...
+So we use an algorithm to do that. 
+Enter MCMC. We'll explore this later on. 
+But for know just know that the `P(D)` term has no practical meaning (unlike the other terms) and is just a constant that ensures the LHS sums (or integrates) to 1. 
+
+Case study of owls 
+
+A = barking owl
+
+B = observed owl
+
+
+P(owl/obs) = p(obs/there)p( owl is there) / p(obs)
+P(owl) = 0.005
+P(obs/there) = 0.5
+P(obs/not there) = 0.01(mistake for boobook)
+P(obs) = sum prob of all possible ways of seeing an owl =
+Prob no owl but see it + prob owl and we do see it =
+`0.995*0.01+ 0.5*0.005`
+
+So overall probability of barking owl given my observation = 
+```{r}
+0.5*0.005/((0.995*0.01) +(0.5*0.005))
+```
+
+Bayesian thinking can be a way of life.  
+
+# Case-study fish vs SST 
+
+Regression of fish vs SST
+What do you know about if this is all I told you. 
+What are our priors? 
+Let's do it as frequentists first, then as bayesians. 
+
+# Maximum likelihood GLM
 
 ```{r}
-library(simstudy)
 library(brms)
 library(dplyr)
 library(ggplot2)
 library(patchwork)
+library(tidyr)
 theme_set(theme_classic())
 ```
 
 
-## Using simstudy
+## Generate some data 
+
+Sorry not using simstudy anymore! 
 
 ```{r}
-def <- defData(varname = "sst", dist = "uniform", formula = "8;25") %>%
-  defData(., varname = "fish", dist = "poisson", 
-    formula = " sst * 0.1", link = "log")
+pois_glm_sim <- function(params, x, seed = runif(1, 0, 100000)){
+    set.seed(seed)
+  
+  with(params,{
+    lambda = exp(alpha + beta*x)
+    y = rpois(length(x), lambda)
+    data.frame(id = 1:length(y), alpha, beta, x, lambda, y)
+  })
+    
+}
+
+```
+
+
+```{r}
+set.seed(55)
+N <- 50
+params <- data.frame(alpha = 0,
+               beta = 0.15)
+sst_range <- c(8, 25)
+sst <- runif(N, sst_range[1], sst_range[2])
+sstnorm <- scale(sst)
+dat <- pois_glm_sim(params, x = sst, seed = 42)
+
 ```
 
 ```{r}
-set.seed(42)
-dat <- genData(50, def) %>%
-  arrange(sst)
 ggplot(dat) + 
-  aes(x = sst, y = fish) + 
+  aes(x = x, y = y) + 
   geom_point()
 ```
+
 ## Fitting a glm
 
 ```{r}
-m1 <- glm(fish ~ sst, family = "poisson",
+m1 <- glm(y ~ x, family = "poisson",
           data = dat)
 pred_m1 <- predict(m1,
                         se = TRUE)
@@ -72,7 +206,7 @@ dat$pred_glm <- pred_m1$fit
 dat$pred_glm_se <- pred_m1$se.fit
 
 g1 <- ggplot(dat) + 
-  aes(x = sst, y = fish) + 
+  aes(x = x, y = y) + 
   geom_point() + 
   geom_line(aes(y = exp(pred_glm)), color = "red") + 
   geom_ribbon(aes(ymin = exp(pred_glm - pred_glm_se*1.96),
@@ -81,19 +215,30 @@ g1 <- ggplot(dat) +
               fill = "red")
 
 g1
-```
-## Bayesian GLM with brms
+```  
+
+# Bayesian GLM with brms
 
 Try this first with only 1050 samples
 
-```{r}
-b1 <- brm(fish ~ sst, family = "poisson",
+```{r eval=FALSE}
+options(mc.cores = parallel::detectCores())
+
+b1 <- brm(y ~ x, family = "poisson",
           data = dat,
           chains = 4,
-          iter = 1200,
+          iter = 2000,
           thin = 1,
           warmup = 1000,
           cores = 4)
+# save(b1, file = "models/b1.rda")
+
+```
+```{r echo=FALSE}
+load("models/b1.rda")
+```
+
+```{r}
 summary(b1)
 ```
 
@@ -108,12 +253,16 @@ plot(b1)
 # shinystan::launch_shinystan(b1)
 ```
 
+#### The folk theorem of statistical computing
+
+"When you have computational problems, often there’s a problem with your model (Yao, Vehtari, and Gelman, 2020)" (or your model is misspecified with respect to the data at hand)
 
 ## Plotting predictions 
 
 ```{r}
 conditional_effects(b1)
 ```
+
 ## Extracting samples 
 
 ```{r}
@@ -126,9 +275,7 @@ dim(pred_b1)
 quantile(pred_b1[,1], c(0.025, 0.5, 0.975))
 ```
 
-
-
-## Comparing to GLM 
+# Comparing to GLM 
 
 
 ```{r}
@@ -139,7 +286,7 @@ dat$pred_brm_upr <- apply(pred_b1, 2,
                           quantile, probs = 0.975)
 
 g2 <- ggplot(dat) + 
-  aes(x = sst, y = fish) + 
+  aes(x = x, y = y) + 
   geom_point() + 
   geom_line(aes(y = pred_brm), color = "blue") + 
   geom_ribbon(aes(ymin = pred_brm_lwr,
@@ -151,6 +298,7 @@ g2 <- ggplot(dat) +
 ```{r}
 g1 + g2
 ```
+# Predictive intervals 
 
 ```{r}
 pred_b1 <- posterior_predict(b1)
@@ -161,7 +309,7 @@ dat$pred_int_upr <- apply(pred_b1, 2,
                           quantile, probs = 0.975)
 
 g3 <- ggplot(dat) + 
-  aes(x = sst, y = fish) + 
+  aes(x = x, y = y) + 
   geom_point() + 
   geom_line(aes(y = pred_int), color = "green") + 
   geom_ribbon(aes(ymin = pred_brm_lwr,
@@ -175,52 +323,446 @@ g3
 
 ```
 
-## Under the hood - stan code 
+# Under the hood - stan code 
 
+## Simulating data from priors 
 
-
-## Random effects 
+AKA prior predictive check 
 
 ```{r}
-gen.school <- defData(
-  varname = "s0", dist = "normal",
-  formula = 0, variance = 3, id = "idSchool"
-)
-gen.school <- defData(gen.school,
-  varname = "nClasses",
-  dist = "noZeroPoisson", formula = 3
-)
+library(rstan)
+options(mc.cores = parallel::detectCores())
 
-dtSchool <- genData(3, gen.school) #'
-dtSchool
-dtClass <- genCluster(dtSchool,
-  cLevelVar = "idSchool",
-  numIndsVar = "nClasses", level1ID = "idClass"
-)
-dtClass
+dat_in <- list(N = nrow(dat), y = dat$y,
+               x = dat$x)
 
-dtClass <- genCluster(dtSchool,
-  cLevelVar = "idSchool",
-  numIndsVar = 3, level1ID = "idClass"
-)
-dtClass
+compiled_model <- stan_model("glm-poisson-sim.stan")
+
+sim_out <- sampling(
+  compiled_model, data = dat_in)
+
+prior_sims  <- sim_out %>% 
+  as.data.frame %>% 
+  select(contains("y_sim"))
+
+summary_tbl <- apply(prior_sims[1:5,], 1, summary)
+summary_tbl
 ```
 
-## Unusual distributions 
+```{r}
+exp(1 + max(dat$x)*1)
+```
+Wow!
 
-Hurdle model
+Try normalize x  
+```{r}
+dat$xscale <- scale(dat$x)
+exp(4+ max(dat$xscale)*2)
+```
+```{r}
+dat_in <- list(N = nrow(dat), y = dat$y,
+               x = as.numeric(dat$xscale))
+
+sim_out <- sampling(
+  compiled_model, data = dat_in)
+
+prior_sims  <- sim_out %>% 
+  as.data.frame %>% 
+  select(contains("y_sim"))
+
+summary_tbl <- apply(prior_sims[1:5,], 1, summary)
+summary_tbl
+```
+
+```{r}
+sims_dat <- prior_sims[1:15,] %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(x = dat_in$x) %>%
+  pivot_longer(-x, names_to = "sim",
+               values_to = "y")
+  
+ggplot(sims_dat) +
+  aes(x = x,y = y) + 
+  geom_point() + 
+  facet_wrap(~sim, scale = "free")
+```
+
+## Fitting the stan model 
 
 
+```{r, message=FALSE,warning=FALSE,eval=FALSE}
+
+dat_in <- list(N = nrow(dat), y = dat$y,
+               x = as.numeric(dat$xscale))
+
+fit1 <- stan(file = "glm-poisson.stan",
+          data = dat_in,
+          iter = 2000,
+          warmup = 1000,
+          thin = 1,
+          chains =  4,
+          refresh = 500,
+          )
+save(fit1, file = "models/fit1.rda")
+
+```
+```{r echo=FALSE}
+load("models/fit1.rda")
+```
+
+```{r}
+xout <- rstan::extract(fit1)
+names(xout)
+quantile(xout$alpha, c(0.025, 0.5, 0.975))
+quantile(xout$beta, c(0.025, 0.5, 0.975))
+plot(density(xout$alpha))
+```
+
+```{r}
+fit_summary <- summary(fit1, pars = c("alpha", "beta"),
+                       probs = c(0.033, 0.5, 0.67))
+fit_summary$summary
+```
+## Plotting predictions 
+
+We can use the `y_sim` or do it this way: 
+
+Make a list of dataframes: 
+
+```{r}
+listparams <- Map(function(alpha,beta) data.frame(alpha,
+                              beta), 
+       xout$alpha,
+       xout$beta)
+```
+
+### Predictions using our function 
+
+```{r}
+datpred <- lapply(listparams, pois_glm_sim,
+                  x = dat$xscale) %>%
+  do.call("rbind", .)
+
+datpred <- datpred %>%
+  group_by(id) %>%
+  summarize(x = mean(x),
+            lambda = mean(lambda))
+
+ggplot(datpred) + 
+  aes(x = x, y = lambda) + 
+  geom_line()
+```
 
 
-## Priors
+# Random effects models 
+
+```{r}
+pois_glmm_sim <- function(params, x, 
+                          N_per_group, 
+                          ngrps,
+                          seed = runif(1,0, 10000)){
+  
+  set.seed(seed)
+  
+  #total sample size
+  N <- N_per_group * ngrps
+  
+  with(params, {
+    #random effects 
+    z <- rnorm(ngrps, 0, sigma)
+    Z <- rep(z, each = N_per_group)
+
+    #poisson mean
+    lambda <- exp(alpha + beta*x + Z)
+    y <- rpois(N, lambda)
+    data.frame(id = 1:length(y), 
+               x, lambda, y,
+               #just a trick to convert Z into integer site IDs:
+               siteID = as.numeric(factor(Z)))
+  })
+  
+}
+```
 
 
 ```{r}
+#sst values (1 per group/site)
+ngrps <- 12
+N_per_group <- 5
+x <- runif(ngrps, sst_range[1], sst_range[2])
+x <- scale(x)
+x <- rep(x, each = N_per_group) 
+    
+```
+
+
+```{r}
+params <- list(alpha = 2.5,
+               beta = 0.75,
+               sigma = 0.3)
+
+set.seed(77)
+dat2 <- pois_glmm_sim(params, x,
+                          N_per_group, ngrps, 
+                          77)
+
+
+```
+
+try varying sigma!
+
+```{r}
+ggplot(dat2) + 
+  aes(x = x, y = y, color = factor(siteID)) + 
+  geom_point()
+```
+
+## Random effects with stan  
+
+```{r, message=FALSE,warning=FALSE,eval=FALSE}
+
+dat_in <- list(N = nrow(dat2), y = dat2$y,
+               x = dat2$x,
+               igroup = dat2$siteID,
+               K = length(unique(dat2$siteID)))
+
+fitRE <- stan(file = "glm-poisson-random-effects.stan",
+          data = dat_in,
+          iter = 2000,
+          warmup = 1000,
+          thin = 1,
+          chains =  4,
+          refresh = 500)
+save(fitRE, file = "models/fitRE.rda")
+```
+
+```{r echo=FALSE}
+load("models/fitRE.rda")
+```
+
+```{r}
+fit_summary <- summary(fitRE, pars = c("alpha", "beta", "sigma"),
+                       probs = c(0.033, 0.5, 0.67))
+fit_summary$summary
+```
+And compare to what we put in: 
+
+```{r}
+params
+```
+## Random effects with brms  
+
+```{r, message=FALSE,warning=FALSE,eval=FALSE}
+b1ME <- brm(y ~ x + (1|siteID), family = "poisson",
+          data = dat2,
+          chains = 4,
+          iter = 2000,
+          thin = 1,
+          warmup = 1000,
+          cores = 4)
+save(b1ME, file = "models/b1ME.rda")
+
+```
+
+```{r echo=FALSE}
+load("models/b1ME.rda")
+```
+
+```{r}
+summary(b1ME)
+```
+
+
+```{r}
+plot(b1ME)
+```
+
+```{r}
+conditional_effects(b1ME) 
+```
+
+### Look at random effects estimates
+
+```{r}
+b1z <- ranef(b1ME, groups = "siteID")$siteID %>%
+  data.frame() %>%
+  mutate(i = 1:n())
+
+ggplot(b1z) + 
+  aes(x = i) + 
+  geom_point(aes(y = Estimate.Intercept)) + 
+  geom_linerange(aes(ymin = Q2.5.Intercept,
+                     ymax = Q97.5.Intercept))
+```
+
+[Check normality with qqnorm plots](https://www.seascapemodels.org/rstats/2017/10/06/qqplot-non-normal-glm.html)
+
+```{r}
+qqnorm(b1z$Estimate.Intercept)
+qqline(b1z$Estimate.Intercept, lty = 2)
+```
+
+# Importance of variance priors 
+
+```{r}
+hist(rgamma(10000, 10, 0.001))
+```
+
+
+```{r, message=FALSE,warning=FALSE}
+b1_priors <- get_prior(y ~ x + (1|siteID), family = "poisson",
+          data = dat2)
+b1_priors
+prior_sigma <- set_prior("gamma(10, 0.001)", 
+                         class = "sd", coef = "Intercept",
+                         group = "siteID")
+make_stancode(y ~ x + (1|siteID), family = "poisson",
+          data = dat2,
+          prior = prior_sigma,
+          save_model = "dumb-prior.stan")
+```
+
+
+```{r, message=FALSE,warning=FALSE,eval=FALSE}
+b1ME_gamma001 <- brm(y ~ x + (1|siteID), family = "poisson",
+          data = dat2,
+          chains = 4,
+          iter = 2000,
+          thin = 1,
+          warmup = 1000,
+          cores = 4,
+          prior = prior_sigma)
+save(b1ME_gamma001, file = "models/b1ME_gamma001.rda")
+
+```
+
+```{r echo=FALSE}
+load("models/b1ME_gamma001.rda")
+```
+
+```{r}
+summary(b1ME_gamma001)
+```
+
+
+```{r}
+plot(b1ME_gamma001)
+```
+
+Notice the chains never converge! 
+
+```{r eval = FALSE}
+# shinystan::launch_shinystan(b1)
+```
+
+
+# Non-linear models in BRMS 
+
+```{r}
+pois_gamm_sim <- function(params, x, 
+                          N_per_group, 
+                          ngrps,
+                          seed = runif(1,0, 10000)){
+  
+  set.seed(seed)
+  
+  #total sample size
+  N <- N_per_group * ngrps
+  
+  with(params, {
+    #random effects 
+    xs <- splines::ns(x,3)
+    z <- rnorm(ngrps, 0, sigma)
+    Z <- rep(z, each = N_per_group)
+
+    #poisson mean
+    lambda <- exp(alpha + beta1*xs[,1] + beta2*xs[,2] + beta3*xs[,3] + Z)
+    y <- rpois(N, lambda)
+    data.frame(id = 1:length(y), 
+               x, lambda, y,
+               #just a trick to convert Z into integer site IDs:
+               siteID = as.numeric(factor(Z)))
+  })
+  
+}
+```
+
+```{r}
+params <- list(alpha = 1,
+               beta1 = -1,
+               beta2 = 3,
+               beta3 = -1,
+               sigma = 0.2)
+
+set.seed(77)
+dat3 <- pois_gamm_sim(params, x,
+                          N_per_group, ngrps, 
+                          77)
+
+ggplot(dat3) + 
+  aes(x = x, y = y, color = factor(siteID)) + 
+  geom_point()
+```
+
+```{r}
+b1gam1 <- brm(y ~ s(x) + (1|siteID), family = "poisson",
+          data = dat3,
+          chains = 4,
+          iter = 2000,
+          thin = 1,
+          warmup = 1000,
+          cores = 4)
+save(b1gam1, file = "models/b1gam1.rda")
+
+```
+
+```{r echo=FALSE}
+load("models/b1gam1.rda")
+```
+
+```{r}
+summary(b1gam1)
+```
+
+
+```{r}
+plot(b1gam1)
+```
+
+```{r}
+conditional_effects(b1gam1)
+```
+
+# Other ideas for things you can do with brms 
+
+- Hurdle models (for zero inflated data )  
+
+- Simple multivariate models  
+
+- Model missing values of fixed effects   
+
+- Measurement error models/meta-analyses  
+
+- Splines  
+
+- Simple state space models (e.g. AR)  
+
+- Ordinal/categorical models  
+
+- Models where variance/dispersian is regressed against parameters 
+
+- Multilevel models (e.g. RE*fixed effect interactions)
+
+And much more! 
+
+# Priors for fixed effects 
+
+```{r eval=FALSE}
 
 tighter_prior <- 
   set_prior("normal(-5,0.1)", class = "b", coef = "sst")
-b2 <- brm(fish ~ sst, family = "poisson",
+b2 <- brm(y ~ x, family = "poisson",
           data = dat,
           chains = 4,
           iter = 2000,
@@ -231,13 +773,10 @@ b2 <- brm(fish ~ sst, family = "poisson",
 summary(b2)
 ```
 
-## Checking convergence 
+### Comparing to GLM 
 
 
-## Comparing to GLM 
-
-
-```{r}
+```{r eval=FALSE}
 pred_b2 <- posterior_epred(b2)
 dat$pred_brm2 <- colMeans(pred_b2)
 dat$pred_brm_lwr2 <- apply(pred_b2, 2, 
@@ -263,4 +802,18 @@ ggplot(dat) +
 ```
 
 Use predict(b1) if you want the predictive intervals 
+
+
+# Practical things
+
+[Stan userguide online](https://mc-stan.org/users/documentation/)
+
+[Stan and brms forums for Q&A](https://discourse.mc-stan.org/)
+
+My favourite introductory book: [Statistical Rethinking](https://www.amazon.com.au/s?k=statistical+rethinking&adgrpid=88123238558&gclid=CjwKCAiAs92MBhAXEiwAXTi256pXVqV0J16VwZFOn_u_ig2jlQPfGBCeJ3qkSDDZiA4UAD3Rx4sokBoCAGwQAvD_BwE&hvadid=518058673165&hvdev=c&hvlocphy=9069204&hvnetw=g&hvqmt=e&hvrand=10575411477101464194&hvtargid=kwd-300572196203&hydadcr=1924_218846&tag=googhydr0au-22&ref=pd_sl_7w90ddlgy2_e)
+
+[Bayesian workflow](https://arxiv.org/abs/2011.01808)
+
+If you need to speed up analyses, try the INLA package (but it works differently, not using MCMC)
+
 
