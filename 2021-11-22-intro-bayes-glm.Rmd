@@ -298,6 +298,7 @@ g2 <- ggplot(dat) +
 ```{r}
 g1 + g2
 ```
+
 # Predictive intervals 
 
 ```{r}
