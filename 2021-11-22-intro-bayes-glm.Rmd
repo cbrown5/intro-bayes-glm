@@ -815,6 +815,12 @@ My favourite introductory book: [Statistical Rethinking](https://www.amazon.com.
 
 [Bayesian workflow](https://arxiv.org/abs/2011.01808)
 
-If you need to speed up analyses, try the INLA package (but it works differently, not using MCMC)
+[If you need to speed up analyses, try the INLA package (but it works differently, not using MCMC)](https://becarioprecario.bitbucket.io/inla-gitbook/ch-intro.html)
+
+[Fong et al. - equation to help you choose variance priors](https://academic.oup.com/biostatistics/article/11/3/397/256463?login=true)
+
+[My gist to implement their equation in R]( https://gist.github.com/cbrown5/ddb0c0ed922267af65e3dc7a113dcf0e)
+
+[Stan prior recommendations wiki](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations)
 
 

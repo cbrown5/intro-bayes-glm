@@ -15,8 +15,9 @@ transformed parameters{
 }
 
 model {
-  alpha ~ normal(0, 2);
-  beta ~ normal(0,2);
+  //Priors
+  alpha ~ normal(0, 10);
+  beta ~ normal(0, 2);
   
   //likelihoods
   y ~ poisson(lambda);

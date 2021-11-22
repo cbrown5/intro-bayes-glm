@@ -45,7 +45,7 @@ model {
     target += poisson_log_glm_lpmf(Y | Xc, mu, b);
   }
   // priors including all constants
-  target += student_t_lpdf(Intercept | 3, 2.2, 2.5);
+  target += student_t_lpdf(Intercept | 3, 2.6, 2.5);
   target += gamma_lpdf(sd_1[1] | 10, 0.001);
   target += std_normal_lpdf(z_1[1]);
 }
